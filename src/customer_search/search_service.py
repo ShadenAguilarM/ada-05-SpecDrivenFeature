@@ -66,8 +66,10 @@ def normalize_text(text: str) -> str:
     """Normalize text for case-insensitive comparison.
 
     Per SR-04, search comparison shall be case-insensitive and normalized.
+    Strips leading/trailing whitespace, converts to lowercase, and collapses
+    consecutive whitespace characters (spaces, tabs, newlines) into a single space.
     """
-    return text.strip().lower()
+    return " ".join(text.split()).lower()
 
 
 def validate_search_term(query: str | None) -> str:
@@ -127,10 +129,10 @@ def classify_match(customer: Customer, query: str) -> MatchType | None:
         return None
 
     searchable_fields = [
-        customer.name.strip().lower(),
-        customer.surname.strip().lower(),
-        customer.full_name.strip().lower(),
-        customer.email.strip().lower(),
+        normalize_text(customer.name),
+        normalize_text(customer.surname),
+        normalize_text(customer.full_name),
+        normalize_text(customer.email),
     ]
 
     # SR-05: Exact match occurs when normalized search string is equal to at least one field

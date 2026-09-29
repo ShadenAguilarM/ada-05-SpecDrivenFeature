@@ -165,3 +165,113 @@ def test_classify_match_function():
     assert classify_match(customer, "example") == MatchType.PARTIAL
 
     assert classify_match(customer, "Charles") is None
+
+    # Matches with consecutive spaces, tabs, and mixed whitespace
+    assert classify_match(customer, "Ada   Lovelace") == MatchType.EXACT
+    assert classify_match(customer, "Ada\tLovelace") == MatchType.EXACT
+    assert classify_match(customer, "da   Love") == MatchType.PARTIAL
+
+
+def test_normalize_text_collapses_whitespace():
+    """Unit test for normalize_text whitespace collapsing and case conversion."""
+    from customer_search.search_service import normalize_text
+
+    assert normalize_text("  Alice   Smith  ") == "alice smith"
+    assert normalize_text("Alice\t\tSmith") == "alice smith"
+    assert normalize_text("  Alice \t \n  Smith  ") == "alice smith"
+    assert normalize_text("   \t  ") == ""
+    assert normalize_text("") == ""
+    assert normalize_text("ALICE") == "alice"
+
+
+def test_exact_search_by_full_name_with_multiple_spaces(sample_customers: list[Customer]):
+    """Verify exact search by full name with multiple consecutive spaces (FR-01, SR-02, SR-04, SR-05)."""
+    service = SearchService(customers=sample_customers)
+    matches = service.find_matches("Alice    Smith")
+
+    assert len(matches) == 1
+    assert matches[0].customer.full_name == "Alice Smith"
+    assert matches[0].match_type == MatchType.EXACT
+
+    results = service.search("Alice    Smith")
+    assert len(results) == 1
+    assert results[0].full_name == "Alice Smith"
+
+
+def test_exact_search_by_full_name_with_tabs(sample_customers: list[Customer]):
+    """Verify exact search by full name with tabulations and mixed whitespace (FR-01, SR-02, SR-04, SR-05)."""
+    service = SearchService(customers=sample_customers)
+    matches = service.find_matches("Alice\t\tSmith")
+
+    assert len(matches) == 1
+    assert matches[0].customer.full_name == "Alice Smith"
+    assert matches[0].match_type == MatchType.EXACT
+
+    results = service.search("Alice \t Smith")
+    assert len(results) == 1
+    assert results[0].full_name == "Alice Smith"
+
+
+def test_partial_search_by_full_name_with_multiple_spaces(sample_customers: list[Customer]):
+    """Verify partial search matching substring with multiple spaces (FR-02, SR-03, SR-04)."""
+    service = SearchService(customers=sample_customers)
+    matches = service.find_matches("ce    Sm")
+
+    assert len(matches) == 1
+    assert matches[0].customer.full_name == "Alice Smith"
+    assert matches[0].match_type == MatchType.PARTIAL
+
+
+def test_normal_searches_continue_to_function(sample_customers: list[Customer]):
+    """Verify standard single-word and single-space searches continue to function as expected."""
+    service = SearchService(customers=sample_customers)
+
+    # Standard exact full name
+    matches_exact = service.find_matches("Alice Smith")
+    assert len(matches_exact) == 1
+    assert matches_exact[0].customer.name == "Alice"
+    assert matches_exact[0].match_type == MatchType.EXACT
+
+    # Standard single-word name
+    matches_name = service.find_matches("Bob")
+    assert len(matches_name) == 1
+    assert matches_name[0].customer.name == "Bob"
+    assert matches_name[0].match_type == MatchType.EXACT
+
+    # Standard partial substring
+    matches_partial = service.find_matches("lic")
+    assert len(matches_partial) == 1
+    assert matches_partial[0].customer.name == "Alice"
+    assert matches_partial[0].match_type == MatchType.PARTIAL
+
+    # Standard email search
+    matches_email = service.find_matches("bob.j@example.com")
+    assert len(matches_email) == 1
+    assert matches_email[0].customer.email == "bob.j@example.com"
+
+
+def test_empty_or_whitespace_queries_preserve_existing_behavior(sample_customers: list[Customer]):
+    """Verify empty or whitespace-only queries continue to return no matches and validate as empty."""
+    service = SearchService(customers=sample_customers)
+
+    # Empty string
+    assert service.find_matches("") == []
+    assert service.search("") == []
+
+    # Spaces only
+    assert service.find_matches("   ") == []
+    assert service.search("   ") == []
+
+    # Tabs and newlines only
+    assert service.find_matches(" \t \n ") == []
+    assert service.search(" \t \n ") == []
+
+    # execute_search rejects empty and whitespace queries
+    res_empty = service.execute_search("")
+    assert res_empty.is_valid is False
+    assert res_empty.customers == []
+
+    res_ws = service.execute_search("  \t  ")
+    assert res_ws.is_valid is False
+    assert res_ws.customers == []
+
