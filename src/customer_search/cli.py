@@ -11,7 +11,6 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any
 
 if __package__ is None or __package__ == "":
     src_dir = str(Path(__file__).resolve().parent.parent)
@@ -20,11 +19,8 @@ if __package__ is None or __package__ == "":
 
 from customer_search.customer import Customer
 from customer_search.search_service import (
-    MSG_EMPTY_SEARCH,
-    MSG_NO_CUSTOMERS_FOUND,
     SearchResult,
     SearchService,
-    execute_search,
 )
 
 

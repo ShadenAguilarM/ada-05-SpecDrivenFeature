@@ -12,12 +12,11 @@ Covers requirements and acceptance criteria:
 import pytest
 
 from customer_search import (
-    Customer,
     MSG_EMPTY_SEARCH,
     MSG_NO_CUSTOMERS_FOUND,
-    SearchResult,
-    SearchService,
     VALID_SEARCH_FIELDS,
+    Customer,
+    SearchService,
     classify_match,
     execute_search,
     search,

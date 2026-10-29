@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 """Deterministic repository-readiness and contract checker.
 
-Verifies essential repository structure, required documentation,
-standard commands, requirement-ID references, and security conventions.
+Verifies:
+1. Essential repository structure and source-of-truth documentation.
+2. Standard commands documented in AGENTS.md.
+3. Functional requirement references in SPEC.md.
+4. Sensitive filenames tracked by Git.
+5. Content-level secret scanning across tracked files.
+6. Filesystem-level read-only protection of data/customers.json.
 """
 
-from fnmatch import fnmatch
-from pathlib import Path
+from __future__ import annotations
+
+import os
+import re
 import subprocess
 import sys
+from fnmatch import fnmatch
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -22,8 +31,11 @@ ESSENTIAL_PATHS = [
     "TASKS.md",
     "docs/REPO_MAP.md",
     "docs/traceability.md",
-    # Build & Configuration
+    # Build & Configuration & Hygiene
+    ".gitignore",
+    ".gitattributes",
     "pyproject.toml",
+    "requirements-dev.lock",
     # Essential Data
     "data/customers.json",
     # Verification & Contract Scripts
@@ -37,6 +49,9 @@ ESSENTIAL_PATHS = [
     "src/customer_search/customer.py",
     "src/customer_search/search_service.py",
     "src/customer_search/data_loader.py",
+    # Key Tests
+    "tests/test_architecture_contracts.py",
+    "tests/test_traceability_contract.py",
     # Required Output / Experimental Directory
     "results",
 ]
@@ -69,6 +84,18 @@ PROHIBITED_TRACKED_PATTERNS = [
     "*.p12",
     "id_rsa*",
     "id_dsa*",
+]
+
+CONTENT_SECRET_PATTERNS = [
+    (r"-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----", "Private cryptographic key block"),
+    (r"\bAKIA[0-9A-Z]{16}\b", "AWS Access Key ID"),
+    (r"\bghp_[0-9a-zA-Z]{36}\b", "GitHub personal access token"),
+    (r"\bgithub_pat_[0-9a-zA-Z_]{82}\b", "GitHub fine-grained access token"),
+    (r"\bxox[baprs]-[0-9a-zA-Z]{10,48}\b", "Slack token"),
+    (
+        r'(?i)\b(?:api[_-]?key|auth[_-]?token|bearer)\s*=\s*["\'][A-Za-z0-9_\-]{24,}["\']',
+        "Hardcoded API or Auth Token",
+    ),
 ]
 
 
@@ -131,6 +158,65 @@ def check_sensitive_tracked_files(root: Path) -> list[str]:
     return errors
 
 
+def check_content_secrets(root: Path) -> list[str]:
+    """Scan tracked text files for hardcoded secrets, tokens, and private keys."""
+    try:
+        proc = subprocess.run(
+            ["git", "ls-files"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return []
+
+    if proc.returncode != 0:
+        return []
+
+    tracked_files = proc.stdout.splitlines()
+    errors = []
+    for rel_path in tracked_files:
+        file_path = root / rel_path
+        if not file_path.is_file():
+            continue
+        # Skip binary files, check_repo_contract itself, or git metadata
+        if (
+            file_path.suffix in (".pyc", ".png", ".jpg", ".ico", ".bin")
+            or rel_path == "scripts/check_repo_contract.py"
+        ):
+            continue
+        try:
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+
+        for pattern, description in CONTENT_SECRET_PATTERNS:
+            if re.search(pattern, content):
+                errors.append(f"Potential secret detected ({description}) in {rel_path}")
+    return errors
+
+
+def check_data_customers_filesystem_readonly(root: Path) -> list[str]:
+    """Verify data/customers.json has filesystem-level read-only protection."""
+    data_file = root / "data" / "customers.json"
+    if not data_file.exists():
+        return ["data/customers.json does not exist"]
+
+    # Verify write access fails
+    try:
+        with open(data_file, "a", encoding="utf-8") as f:
+            f.write(" ")
+        return ["Filesystem write protection failed: data/customers.json was opened in write mode!"]
+    except PermissionError:
+        return []
+    except Exception as e:
+        # If open fails for other reasons, verify os.access
+        if not os.access(data_file, os.W_OK):
+            return []
+        return [f"Filesystem write protection verification error: {e}"]
+
+
 def main() -> int:
     all_errors = []
 
@@ -145,6 +231,12 @@ def main() -> int:
 
     # 4. Sensitive files tracked by Git
     all_errors.extend(check_sensitive_tracked_files(ROOT))
+
+    # 5. Content-level secret scan across tracked files
+    all_errors.extend(check_content_secrets(ROOT))
+
+    # 6. Filesystem read-only protection on data/customers.json
+    all_errors.extend(check_data_customers_filesystem_readonly(ROOT))
 
     if all_errors:
         print("REPO_CONTRACT: FAIL")

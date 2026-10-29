@@ -9,10 +9,10 @@ cd "${REPO_ROOT}"
 export PYTHONPATH="src"
 export PYTHONDONTWRITEBYTECODE=1
 
-echo "[1/4] Checking repository contract readiness"
+echo "[1/6] Checking repository contract readiness & secret scanning"
 python scripts/check_repo_contract.py
 
-echo "[2/4] Verifying protected files integrity"
+echo "[2/6] Verifying protected files integrity & filesystem permissions"
 python -c '
 import hashlib, os, sys
 
@@ -34,14 +34,41 @@ for path, expected in PROTECTED_FILES.items():
         print(f"Expected: {expected}", file=sys.stderr)
         print(f"Actual:   {norm}", file=sys.stderr)
         sys.exit(1)
+
+# Verify filesystem-level read-only protection on data/customers.json
+try:
+    with open("data/customers.json", "a") as f:
+        f.write(" ")
+    print("ERROR: data/customers.json is writable; expected filesystem read-only attribute!", file=sys.stderr)
+    sys.exit(1)
+except PermissionError:
+    pass
+except Exception as e:
+    print(f"ERROR: Unable to verify filesystem permissions: {e}", file=sys.stderr)
+    sys.exit(1)
 '
 
-echo "[3/4] Running tests (pytest)"
-python -m pytest -v
+echo "[3/6] Checking code formatting (ruff format)"
+ruff format --check .
 
-echo "[4/4] Checking repository cleanliness"
+echo "[4/6] Running linter (ruff check)"
+ruff check .
+
+echo "[5/6] Running static type checker (mypy)"
+mypy src tests
+
+echo "[6/6] Running test suite with coverage & reports (pytest)"
+python -m pytest
+
+echo "Checking repository cleanliness"
 if command -v git >/dev/null 2>&1; then
-    PYC_FILES=$(git status --porcelain | grep -E '\.pyc$' || true)
+    PYC_TRACKED=$(git ls-files "*.pyc" || true)
+    if [ -n "${PYC_TRACKED}" ]; then
+        echo "ERROR: Compiled bytecode (*.pyc) files are tracked in git index:" >&2
+        echo "${PYC_TRACKED}" >&2
+        exit 1
+    fi
+    PYC_FILES=$(git status --porcelain | grep -E '^(\?\?|.[MRA]).*\.pyc$' || true)
     if [ -n "${PYC_FILES}" ]; then
         echo "ERROR: Untracked or modified compiled bytecode (*.pyc) files detected:" >&2
         echo "${PYC_FILES}" >&2

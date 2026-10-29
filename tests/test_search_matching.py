@@ -4,11 +4,9 @@ import pytest
 
 from customer_search import (
     Customer,
-    CustomerMatch,
     MatchType,
     SearchService,
     classify_match,
-    search,
 )
 
 

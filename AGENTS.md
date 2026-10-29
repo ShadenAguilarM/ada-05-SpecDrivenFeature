@@ -42,14 +42,22 @@ The repository is structured as follows:
 Commands verified in the target environment (Windows PowerShell, Python 3.11+):
 
 ### Environment & Installation
-Install dependencies in the active Python environment:
+Install pinned development and testing dependencies:
 ```powershell
+pip install -r requirements-dev.lock
 pip install -e .
-pip install pytest
+```
+
+### Static Analysis, Linting & Formatting
+Run automated code quality and type checks:
+```powershell
+ruff check .
+ruff format --check .
+mypy src tests
 ```
 
 ### Running Tests
-Execute the full test suite (baseline validation):
+Execute the full test suite with coverage measurement (configured in `pyproject.toml`):
 ```powershell
 pytest
 ```
@@ -72,9 +80,9 @@ Command-line argument mode:
 python src/customer_search/cli.py "Alice"
 ```
 
-### Integrated Validation & Linting Status
+### Integrated Validation & Guardrails
 - **Integrated Repository Validation Script**: `scripts/verify_repo.ps1` (Windows PowerShell) and `scripts/verify_repo.sh` (Bash) are configured. Run the verification script as the primary validation command before declaring a task DONE.
-- **Linters / Type Checkers**: Tools such as Ruff, Flake8, Black, and Mypy are currently **not configured** in `pyproject.toml`. Do not invoke unconfigured linters.
+- **Configured Guardrails**: Ruff (linter and formatter), Mypy (type checker), and `pytest-cov` (coverage threshold >= 90%) are fully configured in `pyproject.toml`. Pre-commit hook is provided in `.git/hooks/pre-commit`.
 
 ## Change Rules
 

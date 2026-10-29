@@ -1,8 +1,6 @@
 """Unit tests for search result ordering and limit (T-05)."""
 
-import pytest
-
-from customer_search import Customer, MAX_RESULTS, SearchService, customer_sort_key, search
+from customer_search import MAX_RESULTS, Customer, SearchService, customer_sort_key
 
 
 def test_exact_matches_before_partial_matches():

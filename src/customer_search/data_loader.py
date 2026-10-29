@@ -12,6 +12,12 @@ from typing import Any
 
 from customer_search.customer import Customer
 
+__all__ = [
+    "DEFAULT_DATA_PATH",
+    "load_customers",
+    "validate_customer_record",
+]
+
 # Default location for the customer JSON file: <project_root>/data/customers.json
 DEFAULT_DATA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "customers.json"
 
@@ -65,7 +71,7 @@ def load_customers(file_path: str | Path | None = None) -> list[Customer]:
         return []
 
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             raw_data = json.load(f)
     except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         return []

@@ -1,0 +1,15 @@
+# Pinned development and verification dependencies for reproducible builds
+# Generated for Python >= 3.11
+ast-serialize==0.13.1
+coverage==7.17.0
+iniconfig==2.3.0
+librt==0.16.0
+mypy==2.4.1
+mypy_extensions==1.1.0
+packaging==26.3
+pathspec==1.1.1
+pluggy==1.6.0
+pytest==9.1.1
+pytest-cov==7.1.0
+ruff==0.17.3
+typing_extensions==4.16.0

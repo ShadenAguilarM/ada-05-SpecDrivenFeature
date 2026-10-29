@@ -3,12 +3,11 @@
 import pytest
 
 from customer_search import (
-    Customer,
     MSG_EMPTY_SEARCH,
     MSG_NO_CUSTOMERS_FOUND,
+    Customer,
     SearchService,
     format_customer_display,
-    format_search_results,
     main,
     run_search_cli,
 )
@@ -133,6 +132,7 @@ def test_cli_argument_mode(mock_service: SearchService):
 
 def test_cli_eof_handling(mock_service: SearchService):
     """Verify EOF (e.g. Ctrl+D) is handled gracefully without exception."""
+
     def raise_eof(_: str) -> str:
         raise EOFError()
 

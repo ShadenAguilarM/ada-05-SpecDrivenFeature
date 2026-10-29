@@ -11,15 +11,10 @@ import json
 import time
 from pathlib import Path
 
-import pytest
-
 from customer_search import (
-    Customer,
     MSG_EMPTY_SEARCH,
     MSG_NO_CUSTOMERS_FOUND,
     SearchService,
-    format_customer_display,
-    main,
     run_search_cli,
 )
 
@@ -57,7 +52,9 @@ def test_ts_03_search_by_full_name():
     )
 
     assert exit_code == 0
-    assert any("David Wilson" in line and "david.wilson@example.com" in line for line in output_lines)
+    assert any(
+        "David Wilson" in line and "david.wilson@example.com" in line for line in output_lines
+    )
 
 
 def test_ts_04_search_by_email():
@@ -69,7 +66,9 @@ def test_ts_04_search_by_email():
     )
 
     assert exit_code == 0
-    assert any("Charlie Brown" in line and "charlie.brown@example.com" in line for line in output_lines)
+    assert any(
+        "Charlie Brown" in line and "charlie.brown@example.com" in line for line in output_lines
+    )
 
 
 def test_ts_05_partial_matches():

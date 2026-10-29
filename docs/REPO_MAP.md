@@ -25,6 +25,8 @@ Automated tests are written with `pytest` and reside directly under `tests/`:
 - `tests/test_cli.py` — Unit and integration tests for CLI interaction, argument parsing, prompt formatting, and EOF handling.
 - `tests/test_search_field_filter.py` — Unit tests for field-specific search filtering capability (`filter_field`).
 - `tests/test_setup.py` — Environment verification tests (Python version compatibility).
+- `tests/test_architecture_contracts.py` — Architecture contract tests verifying export parity, module boundary isolation, domain model immutability, and filesystem permissions.
+- `tests/test_traceability_contract.py` — Traceability contract tests verifying coverage of all requirements (FR-01 to FR-08, NFR-01 to NFR-03), acceptance criteria (AC-01 to AC-11), and test scenarios (TS-01 to TS-13).
 - `tests/test_scenarios.py` — End-to-end acceptance tests mapping directly to specification scenarios `TS-01` through `TS-13` and criteria `AC-01` through `AC-11`.
 
 ## Change Guide

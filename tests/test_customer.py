@@ -1,7 +1,8 @@
 """Unit tests for Customer model (T-02)."""
 
-import pytest
 from dataclasses import FrozenInstanceError
+
+import pytest
 
 from customer_search import Customer
 from customer_search.customer import Customer as CustomerDirect

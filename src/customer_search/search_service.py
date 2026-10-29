@@ -10,13 +10,31 @@ Satisfies: FR-01, FR-02, FR-03, FR-04, FR-05, FR-06, FR-08,
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import Sequence
 
 from customer_search.customer import Customer
 from customer_search.data_loader import load_customers
+
+__all__ = [
+    "MAX_RESULTS",
+    "MSG_EMPTY_SEARCH",
+    "MSG_NO_CUSTOMERS_FOUND",
+    "VALID_SEARCH_FIELDS",
+    "CustomerMatch",
+    "InvalidSearchTermError",
+    "MatchType",
+    "SearchResult",
+    "SearchService",
+    "classify_match",
+    "customer_sort_key",
+    "execute_search",
+    "normalize_text",
+    "search",
+    "validate_search_term",
+]
 
 # Maximum number of customer results per search (FR-06, SR-07)
 MAX_RESULTS: int = 10
@@ -223,7 +241,11 @@ class SearchService:
         field: str | None = None,
     ) -> list[Customer]:
         """Return all customers with exact matches for the query, sorted alphabetically."""
-        exact = [m.customer for m in self.find_matches(query, field=field) if m.match_type == MatchType.EXACT]
+        exact = [
+            m.customer
+            for m in self.find_matches(query, field=field)
+            if m.match_type == MatchType.EXACT
+        ]
         return sorted(exact, key=customer_sort_key)
 
     def get_partial_matches(
@@ -232,7 +254,11 @@ class SearchService:
         field: str | None = None,
     ) -> list[Customer]:
         """Return all customers with partial matches for the query, sorted alphabetically."""
-        partial = [m.customer for m in self.find_matches(query, field=field) if m.match_type == MatchType.PARTIAL]
+        partial = [
+            m.customer
+            for m in self.find_matches(query, field=field)
+            if m.match_type == MatchType.PARTIAL
+        ]
         return sorted(partial, key=customer_sort_key)
 
     def search(

@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+__all__ = ["Customer"]
+
 
 @dataclass(frozen=True)
 class Customer:

@@ -7,11 +7,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from customer_search import (
-    Customer,
-    InvalidSearchTermError,
     MSG_EMPTY_SEARCH,
     MSG_NO_CUSTOMERS_FOUND,
-    SearchResult,
+    Customer,
+    InvalidSearchTermError,
     SearchService,
     execute_search,
     validate_search_term,

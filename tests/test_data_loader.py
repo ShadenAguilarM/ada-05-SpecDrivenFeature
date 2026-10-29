@@ -5,8 +5,6 @@ import json
 import time
 from pathlib import Path
 
-import pytest
-
 from customer_search import Customer, load_customers
 from customer_search.data_loader import DEFAULT_DATA_PATH, validate_customer_record
 from customer_search.loader import load_customers as load_customers_alias
