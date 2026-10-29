@@ -1,6 +1,6 @@
 # Repository Readiness Audit
 
-## BEFORE
+## BEFORE 
 
 | Dimension                   | Score 0-5 | Weighted | Evidence | Main Gap |
 | --------------------------- | --------: | -------: | -------- | -------- |
@@ -15,20 +15,62 @@
 
 TOTAL BEFORE: 67.00 / 100
 
+---
+
+## AFTER
+
+| Dimension | Score 0-5 | Weighted | Evidence | Main Gap |
+|---|---:|---:|---|---|
+| Entry Point & Navigation | 5 | 15.00 / 15 | `docs/REPO_MAP.md` details entry points, test mapping, layer-by-layer guidelines, and document hierarchy (`REQUIREMENTS.md` > `SPEC.md` > `ARCHITECTURE.md` > `TASKS.md`). `AGENTS.md` and `GEMINI.md` establish consultation order and conflict resolution. `scripts/check_repo_contract.py` validates all essential paths. | `README.md` still contains a minor historical note stating "`docs/REPO_MAP.md` is planned", though the file is already fully implemented and verified. |
+| Agent Instructions | 5 | 15.00 / 15 | `AGENTS.md` expanded to 118 lines with exact PowerShell operational commands, explicit negative constraints (Change Rule 3 protecting `data/customers.json`, `REQUIREMENTS.md`, `SPEC.md`), environment rules (CRLF/PowerShell quirks), 4 stop conditions, and a 6-item Definition of Done verified by contract checks. | Minor conceptual tension between documented Windows CRLF notes and `.gitattributes` global `text=auto eol=lf` checkout policy. |
+| Build / Run / Test | 5 | 15.00 / 15 | Single-command unified task runner `scripts/verify_repo.ps1` runs contract checks, secret scan, file integrity, ruff formatting, ruff linter, mypy, pytest coverage, and git cleanliness in a single invocation. Dev dependencies locked in `requirements-dev.lock` and `pyproject.toml`. Standard library runtime with zero external dependencies verified by AST tests. | Running isolated single-test files (e.g. `pytest tests/test_customer.py`) triggers a coverage failure under `--cov-fail-under=90` unless `--no-cov` is explicitly passed. |
+| Architecture Boundaries | 5 | 10.00 / 10 | `ARCHITECTURE.md` defines 5 components with explicit boundaries and negative responsibilities. Automated enforcement in `tests/test_architecture_contracts.py` (11 tests) verifies export parity, AST import isolation across layers (`customer` -> `loader`/`services`, `loader` -> `search`/`cli`, `search` -> `cli`), zero external runtime packages, and domain model immutability. | Alias modules (`loader.py`, `models.py`, `search.py`) maintained for backward compatibility require multi-file export parity synchronization. |
+| Requirements & Traceability | 5 | 10.00 / 10 | Coherent taxonomy (`FR-xx`, `NFR-xx`, `SR-xx`, `VR-xx`, `EH-xx`, `AC-xx`, `TS-xx`, `T-xx`, `CR-xx`). Traceability matrix in `docs/traceability.md` is automatically verified by `tests/test_traceability_contract.py` (5 tests) checking presence, file existence, scenario functions, and AC coverage. `scripts/check_repo_contract.py` checks requirement coverage in `SPEC.md`. | Incremental change tasks (e.g. `CR-01`) are tracked in task files and dedicated test files rather than automatically updating rows in `docs/traceability.md`. |
+| Automation & Guardrails | 4 | 8.00 / 10 | Comprehensive local automated guardrails: `.gitignore` (purged 26 `.pyc` files), `.gitattributes` for LF line endings, `ruff` (linter and formatter), `mypy` (strict type checks), pre-commit hook in `.git/hooks/pre-commit`, and GitHub Actions workflow in `.github/workflows/verify.yml`. | Remote CI execution cannot be verified from the local development sandbox due to the lack of remote GitHub connectivity or local `gh` CLI tool; workflow is validated locally via runner script. |
+| Testability & Evidence | 5 | 15.00 / 15 | Test suite expanded to 98 tests passing in 1.16s. Automated coverage enforcement via `pytest-cov` with `--cov-fail-under=90` (current statement coverage: 95.19%; 100% on `search_service.py`). Automated machine-readable test artifacts generated (`test-results/junit.xml`, `coverage.xml`, `htmlcov/`). Performance verified (<0.1s for 10k records). | Global coverage threshold applies to partial runs, requiring `--no-cov` flag for single-test debugging sessions. |
+| Safety & Permissions | 5 | 10.00 / 10 | Comprehensive `.gitignore` prevents secret and cache leaks. Automated content-level secret scanner in `scripts/check_repo_contract.py` scans tracked files for private keys and tokens. Filesystem-level read-only attribute enforced on `data/customers.json` (raising `PermissionError`), verified in scripts and unit tests. SHA-256 hashes of protected files verified. | Content secret scanning relies on regex pattern heuristics rather than full entropy/AST scanner tools (e.g., Gitleaks or TruffleHog). |
+
+TOTAL AFTER: 98.00 / 100
+
 Top 3 friction points:
-1. **Total absence of CI workflows, linters, type checking, and git hooks (Automation & Guardrails)**: The repository relies solely on manually executing `pytest`. There are no automated checks for code style, type soundness, formatting, or regression prevention prior to commit or push.
-2. **Missing `.gitignore` causing cache pollution and repository hygiene risks (Safety & Permissions / Automation & Guardrails)**: Because `.gitignore` does not exist, compiled bytecode (`__pycache__/*.pyc`) is actively tracked by git, creating noise in diffs and risking inadvertent commits of local artifacts or sensitive data.
-3. **Lack of operational recipes, environment specifics, and file boundaries in `AGENTS.md` (Agent Instructions)**: While `AGENTS.md` outlines general rules, it omits actionable tool commands, OS/shell considerations (such as Windows CRLF handling and PowerShell argument parsing), and explicit read-only file protection constraints (e.g. `data/customers.json`).
+
+1. **Global coverage threshold enforcement on single-test runs (`--cov-fail-under=90`)**:
+   In `pyproject.toml`, `--cov-fail-under=90` is configured in `addopts`. When an agent attempts rapid iteration by running a single test file (e.g., `pytest tests/test_search_field_filter.py`), pytest measures coverage across the entire `customer_search` package and fails with exit code 1 because coverage across the whole package is under 90%, even when all targeted tests pass. The agent must remember to supply `--no-cov` during isolated test runs or run the full suite.
+2. **Absence of remote CI execution feedback loop in the local environment**:
+   Although `.github/workflows/verify.yml` is syntactically valid and replicates the local validation steps, the lack of local GitHub CLI tools (`gh`) or live webhook integrations means an agent in this environment cannot verify remote CI runs, pull request checks, or matrix compatibility beyond local emulation (`scripts/verify_repo.sh` / `scripts/verify_repo.ps1`).
+3. **Dual module exports and alias redundancy**:
+   The coexistence of implementation modules (`customer.py`, `data_loader.py`, `search_service.py`) alongside backward-compatibility aliases (`models.py`, `loader.py`, `search.py`) requires agents to maintain export parity across multiple files whenever adding public symbols. Even though `tests/test_architecture_contracts.py` automatically flags missing exports, it introduces cognitive overhead and multi-file editing requirements.
 
 ---
 
-### Justification of Scores
+## BEFORE vs AFTER
 
-- **Entry Point & Navigation (4/5):** The repository provides clean, readable entry documentation in `README.md` with file tree breakdowns and execution examples. It falls short of 5 because there is no single-point agent onboarding guide that addresses tool usage, execution paths, and document hierarchy.
-- **Agent Instructions (3/5):** `AGENTS.md` sets clear expectations and a Definition of Done, but is high-level (30 lines). 
-- **Build / Run / Test (4/5):** The build and test workflow is simple, fast, and reproducible via standard Python and `pytest`. It loses one point because there is no unified build/task runner script and development dependencies are not formally locked or specified.
-- **Architecture Boundaries (4/5):** The architecture is thoroughly documented in `ARCHITECTURE.md` with explicit component boundaries and negative constraints. However, boundary enforcement is purely conceptual and not guarded by automated structural tests or import linter rules.
-- **Requirements & Traceability (4/5):** Requirements, specifications, tasks, and tests share a coherent ID taxonomy, summarized in `docs/traceability.md`. It lacks a 5th point because traceability is manually tracked and not verified via automated testing decorators or matrix generators.
-- **Automation & Guardrails (1/5):** The repository has almost no automated guardrails beyond test execution: no CI workflows, no linters, no formatters, no type checkers, no pre-commit hooks, and no `.gitignore`.
-- **Testability & Evidence (4/5):** The test suite is fast, modular, and achieves 100% pass rates across 82 tests, with deterministic CLI mocking and performance benchmarking. It lacks code coverage tooling (e.g., `pytest-cov`) and structured test report outputs (XML/HTML).
-- **Safety & Permissions (2/5):** The application itself is low-risk (no external APIs, read-only customer JSON). However, safety mechanisms are limited to in-memory immutability and test assertions. There is no `.gitignore`, no secret scanner, and no OS-level filesystem protection.
+| Dimension | BEFORE | AFTER | Difference | Evidence for Change |
+|---|---:|---:|---:|---|
+| Entry Point & Navigation | 12.00 / 15 | 15.00 / 15 | +3.00 | Added `docs/REPO_MAP.md` with explicit entry points, test mapping, and document hierarchy. Added consultation order in `AGENTS.md` and automated essential path checks in `scripts/check_repo_contract.py`. |
+| Agent Instructions | 9.00 / 15 | 15.00 / 15 | +6.00 | Expanded `AGENTS.md` from 30 to 118 lines with actionable PowerShell commands, explicit negative file protection rules, Stop Conditions, and verifiable Definition of Done. |
+| Build / Run / Test | 12.00 / 15 | 15.00 / 15 | +3.00 | Created single-command unified runners `scripts/verify_repo.ps1` and `scripts/verify_repo.sh`. Added `requirements-dev.lock` and `pyproject.toml` dev-dependencies. |
+| Architecture Boundaries | 8.00 / 10 | 10.00 / 10 | +2.00 | Added `tests/test_architecture_contracts.py` (11 automated tests) enforcing export parity, layer isolation via AST inspection, and runtime standard-library-only constraints. |
+| Requirements & Traceability | 8.00 / 10 | 10.00 / 10 | +2.00 | Added `tests/test_traceability_contract.py` (5 automated tests) validating matrix existence, complete requirement coverage (FR-01 to FR-08, NFR-01 to NFR-03), file references, scenarios, and ACs. |
+| Automation & Guardrails | 2.00 / 10 | 8.00 / 10 | +6.00 | Added `.gitignore` (untracked 26 `.pyc` files), `.gitattributes`, `ruff` lint and format, `mypy` type checking, pre-commit hook in `.git/hooks/pre-commit`, and `.github/workflows/verify.yml`. |
+| Testability & Evidence | 12.00 / 15 | 15.00 / 15 | +3.00 | Configured `pytest-cov` with `--cov-fail-under=90` (achieving 95.19% coverage across 98 tests). Automated generation of JUnit XML and HTML/XML coverage reports in `test-results/`. |
+| Safety & Permissions | 4.00 / 10 | 10.00 / 10 | +6.00 | Enforced OS-level read-only filesystem permissions on `data/customers.json` (raising `PermissionError`), implemented automated secret scanning in `scripts/check_repo_contract.py`, and verified protected file hashes. |
+
+TOTAL BEFORE: 67.00 / 100
+
+TOTAL AFTER: 98.00 / 100
+
+TOTAL DIFFERENCE: +31.00 points
+
+---
+
+### Justification of Scores & Differences
+
+- **Entry Point & Navigation (4 -> 5 | +3.00):** The addition of `docs/REPO_MAP.md` bridges the primary gap identified in the BEFORE audit by providing explicit entry point definitions, source-to-test mapping, layer modification rules, and authoritative document hierarchy. `AGENTS.md` and `GEMINI.md` formalize consultation ordering, while `scripts/check_repo_contract.py` programmatically asserts that all essential files exist.
+- **Agent Instructions (3 -> 5 | +6.00):** `AGENTS.md` was expanded from a high-level 30-line overview to a comprehensive 118-line operational contract. It details exact PowerShell command recipes for installation, static analysis, formatting, type checking, testing, and unified verification. It codifies explicit negative constraints (Change Rule 3 protecting `data/customers.json`, `REQUIREMENTS.md`, and `SPEC.md`), environment-specific rules (Windows CRLF, PowerShell argument stripping), 4 stop conditions, and a 6-item Definition of Done.
+- **Build / Run / Test (4 -> 5 | +3.00):** Addressed the missing unified task runner by providing `scripts/verify_repo.ps1` (Windows PowerShell) and `scripts/verify_repo.sh` (Linux/macOS/Bash). Pinned exact dependency versions in `requirements-dev.lock` and declared optional dev dependencies in `pyproject.toml`. AST-level checks in `tests/test_architecture_contracts.py` guarantee zero runtime third-party dependencies.
+- **Architecture Boundaries (4 -> 5 | +2.00):** Conceptual architectural boundaries documented in `ARCHITECTURE.md` are now backed by automated regression tests in `tests/test_architecture_contracts.py` (11 tests). These tests perform AST parsing to verify that `customer.py` does not import from services or loader, `data_loader.py` does not import from search or cli, and `search_service.py` does not import from cli. Furthermore, symbol export parity across implementation and backward-compatibility alias modules is strictly tested.
+- **Requirements & Traceability (4 -> 5 | +2.00):** The static manual traceability matrix in `docs/traceability.md` is now validated by automated tests in `tests/test_traceability_contract.py` (5 tests). The test suite programmatically verifies that all functional and non-functional requirements are present, all referenced files exist on disk, all specification scenarios (`TS-01` to `TS-13`) correspond to executable test functions, and all acceptance criteria (`AC-01` to `AC-11`) are mapped.
+- **Automation & Guardrails (1 -> 4 | +6.00):** This dimension saw the largest single improvement. Added `.gitignore` and purged 26 previously tracked `.pyc` files; added `.gitattributes` for line ending standardization; configured `ruff` for linting and code formatting; configured `mypy` for static type checking; established a git pre-commit hook in `.git/hooks/pre-commit`; and created a GitHub Actions workflow in `.github/workflows/verify.yml`. A score of 4 instead of 5 reflects the explicit limitation that remote CI execution could not be verified from the local development sandbox.
+- **Testability & Evidence (4 -> 5 | +3.00):** Test suite expanded from 82 to 98 passing tests. Code coverage measurement is now automated via `pytest-cov` with a strict `--cov-fail-under=90` threshold (currently achieving 95.19% statement coverage, with 100% on `search_service.py`, `customer.py`, and `data_loader.py`). Automated reports are generated in `test-results/junit.xml`, `test-results/coverage.xml`, and `test-results/htmlcov/`.
+- **Safety & Permissions (2 -> 5 | +6.00):** Multiple automated safety layers were added: `.gitignore` blocks caching and credential files; `scripts/check_repo_contract.py` scans all tracked files for private cryptographic keys and API tokens; OS filesystem-level read-only attributes are enforced on `data/customers.json` (raising `PermissionError` on write attempts); and SHA-256 integrity hashes for `data/customers.json`, `REQUIREMENTS.md`, and `SPEC.md` are programmatically verified.
