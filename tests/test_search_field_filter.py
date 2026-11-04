@@ -16,6 +16,7 @@ from customer_search import (
     MSG_NO_CUSTOMERS_FOUND,
     VALID_SEARCH_FIELDS,
     Customer,
+    MatchType,
     SearchService,
     classify_match,
     execute_search,
@@ -81,6 +82,27 @@ def test_filter_by_full_name_only(filter_customers: list[Customer]):
 
     assert len(results) == 1
     assert results[0].full_name == "Elton John"
+
+
+def test_find_matches_with_field_filter(filter_customers: list[Customer]):
+    """Verify find_matches restricts matching to specified field and returns correct MatchType (CR-01)."""
+    service = SearchService(customers=filter_customers)
+
+    # Email field: only Alice has 'john' in email
+    matches_email = service.find_matches("john", field="email")
+    assert len(matches_email) == 1
+    assert matches_email[0].customer.email == "john.worker@example.com"
+    assert matches_email[0].match_type == MatchType.PARTIAL
+
+    # Name field: only John has 'john' in first name (exact match)
+    matches_name = service.find_matches("john", field="name")
+    assert len(matches_name) == 1
+    assert matches_name[0].customer.name == "John"
+    assert matches_name[0].match_type == MatchType.EXACT
+
+    # Surname field: Elton John (exact) and Robert Johnson (partial)
+    matches_surname = service.find_matches("john", field="surname")
+    assert len(matches_surname) == 2
 
 
 def test_filter_none_or_omitted_preserves_default_behavior(filter_customers: list[Customer]):
