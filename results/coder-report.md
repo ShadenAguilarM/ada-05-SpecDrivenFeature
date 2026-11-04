@@ -75,3 +75,75 @@ Base commit: c4dca4d7bdb6a794833915c95f4aeec484d0b3c5
 [x] Ready for independent review 
  
 This report is NOT an approval. 
+
+## Fix Cycle
+
+### Accepted Findings Addressed
+- **RF-01 (MUST FIX)**: Production code modifications in `src/customer_search/search_service.py` and test suite updates in `tests/test_search_field_filter.py` are now actively implemented and present in the branch diff against base commit `c4dca4d`.
+- **RF-02 (SHOULD FIX)**: Extended `tests/test_search_field_filter.py::test_find_matches_with_field_filter` to test `field="full_name"` (exact and partial) and explicitly assert `match_type == MatchType.EXACT` (Elton John) and `match_type == MatchType.PARTIAL` (Robert Johnson) for `field="surname"`.
+- **RF-03 (SHOULD FIX)**: Added dedicated unit tests `test_get_exact_matches_with_field_filter` and `test_get_partial_matches_with_field_filter` in `tests/test_search_field_filter.py` directly exercising `SearchService.get_exact_matches` and `SearchService.get_partial_matches` with `field` parameters, verifying match filtering, isolation, and alphabetical sorting.
+- **RF-04 (SHOULD FIX)**: Ensured symmetric test coverage of both exact and partial matches across all four supported fields (`name`, `surname`, `full_name`, `email`) in `tests/test_search_field_filter.py`.
+- **RF-05 (SHOULD FIX)**: Refactored `search()` in `src/customer_search/search_service.py` to invoke `find_matches()` once and partition results into exact and partial lists in memory (eliminating redundant full-dataset iteration). Extracted `_classify_match_normalized()` to avoid evaluating static validation and query normalization inside the per-customer matching loop.
+- **RF-06 (OPTIONAL)**: Refactored `src/customer_search/search_service.py` (`_classify_match_normalized` and `customer_sort_key`) to reuse `normalize_text()` instead of repeated inline `.strip().lower()` calls.
+- **RF-07 (OPTIONAL)**: Renamed imported `field` symbol in `src/customer_search/search_service.py` to `from dataclasses import field as dc_field` to eliminate identifier shadowing with method parameter `field`.
+
+### Modified Findings Addressed
+None (all findings were accepted as proposed without modifications to their required actions).
+
+### Files Changed
+- `src/customer_search/search_service.py`:
+  - Resolved `field` identifier shadowing using `from dataclasses import field as dc_field`.
+  - Replaced manual `.strip().lower()` with `normalize_text()`.
+  - Extracted `_classify_match_normalized()` to eliminate redundant static validation inside the loop.
+  - Refactored `search()` to perform a single iteration via `find_matches()` and partition in memory.
+- `tests/test_search_field_filter.py`:
+  - Added exact email search to `test_filter_by_email_only`.
+  - Added partial name search to `test_filter_by_name_only`.
+  - Added partial full_name search to `test_filter_by_full_name_only`.
+  - Updated `test_find_matches_with_field_filter` with explicit `match_type` assertions on surname matches, `field="full_name"` tests, and empty query verification.
+  - Added `test_get_exact_matches_with_field_filter` and `test_get_partial_matches_with_field_filter`.
+
+### Regression Tests Added / Updated
+- `tests/test_search_field_filter.py::test_filter_by_email_only` (updated: verifies both partial and exact email matches with `field="email"`).
+- `tests/test_search_field_filter.py::test_filter_by_name_only` (updated: verifies both exact and partial name matches with `field="name"`).
+- `tests/test_search_field_filter.py::test_filter_by_full_name_only` (updated: verifies both exact and partial full_name matches with `field="full_name"`).
+- `tests/test_search_field_filter.py::test_find_matches_with_field_filter` (updated: verifies `full_name` exact/partial matches, surname match type classifications, and empty query behavior).
+- `tests/test_search_field_filter.py::test_get_exact_matches_with_field_filter` (new: direct verification of `get_exact_matches` with `field` filter across name, surname, full_name, and email).
+- `tests/test_search_field_filter.py::test_get_partial_matches_with_field_filter` (new: direct verification of `get_partial_matches` with `field` filter, match isolation, and alphabetical sorting).
+
+### Commands Executed
+- `pytest tests`: Ran automated test suite and coverage checks.
+- `pytest -v`: Executed all 101 tests with verbose reporting (100% pass, 95.45% coverage).
+- `ruff check src/customer_search/search_service.py`: Checked linting rules on modified service module.
+- `ruff check --fix src/customer_search/search_service.py`: Formatted import order.
+- `ruff check .`: Verified clean linter status across all project files.
+- `ruff format --check .`: Verified formatting compliance across 48 files.
+- `mypy src tests`: Verified static type checking with zero errors in 21 source files.
+- `powershell -ExecutionPolicy Bypass -File scripts/verify_repo.ps1`: Ran integrated repository verification script (6 stages: repo contract, protected files, formatting, linter, type checker, pytest suite).
+
+### Verification Results
+- Repository Contract Check: PASS (`REPO_CONTRACT: PASS`)
+- Protected Files Integrity: PASS (`data/customers.json`, `REQUIREMENTS.md`, `SPEC.md` intact and non-writable)
+- Code Formatting (`ruff format --check .`): PASS (48 files formatted)
+- Linter (`ruff check .`): PASS (All checks passed)
+- Type Checker (`mypy src tests`): PASS (Success: no issues found in 21 source files)
+- Test Suite & Coverage (`pytest`): PASS (101 passed in 1.13s, 95.45% coverage exceeding >= 90% threshold)
+- Repository Cleanliness: PASS (No cache or bytecode artifacts tracked)
+- Overall Status: `VERIFY_REPO: PASS`
+
+### Findings Not Addressed
+None (all accepted findings RF-01 through RF-07 were addressed).
+
+### Limitations
+- As defined in CR-01, search field filtering remains restricted to the 4 supported attributes in `VALID_SEARCH_FIELDS` (`"name"`, `"surname"`, `"full_name"`, `"email"`).
+- Result ordering and truncation to a maximum of 10 customers (`MAX_RESULTS = 10`) apply per FR-06 without pagination.
+- Dataset `data/customers.json` remains read-only.
+
+### Self-Check
+- [x] Only accepted or modified findings were addressed
+- [x] No scope expansion
+- [x] Existing tests not weakened
+- [x] Regression tests added where necessary
+- [x] Ready for independent re-review
+
+This report is NOT an approval.

@@ -1,0 +1,3 @@
+9732898748e779ef83cb3b6a546e07a30dd29ea7 feat: Add verification report for CR-01 with environment checks and results
+b4134e6cb30f7214fad47bf4eff97aeabcbcb69b feat: Implement CR-01 optional field filtering in SearchService and add related unit tests
+0bcabf21982dce26934ec71a25220059a612829d feat: Add CHANGE_REQUEST and run-context documentation for customer search field filtering

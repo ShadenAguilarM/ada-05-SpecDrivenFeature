@@ -11,7 +11,8 @@ Satisfies: FR-01, FR-02, FR-03, FR-04, FR-05, FR-06, FR-08,
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field as dc_field
 from enum import Enum, auto
 from pathlib import Path
 
@@ -79,7 +80,7 @@ class SearchResult:
         is_valid: True if input was valid and search could proceed; False otherwise.
     """
 
-    customers: list[Customer] = field(default_factory=list)
+    customers: list[Customer] = dc_field(default_factory=list)
     message: str | None = None
     is_valid: bool = True
 
@@ -120,10 +121,49 @@ def customer_sort_key(customer: Customer) -> tuple[str, str, str]:
     Sorts by name, then surname, then email address.
     """
     return (
-        customer.name.strip().lower(),
-        customer.surname.strip().lower(),
-        customer.email.strip().lower(),
+        normalize_text(customer.name),
+        normalize_text(customer.surname),
+        normalize_text(customer.email),
     )
+
+
+def _classify_match_normalized(
+    customer: Customer,
+    normalized_query: str,
+    field: str | None = None,
+) -> MatchType | None:
+    """Classify the match type of a customer using a pre-normalized query.
+
+    Internal helper used by find_matches and classify_match.
+    """
+    if not normalized_query:
+        return None
+
+    if field == "name":
+        searchable_fields = [normalize_text(customer.name)]
+    elif field == "surname":
+        searchable_fields = [normalize_text(customer.surname)]
+    elif field == "full_name":
+        searchable_fields = [normalize_text(customer.full_name)]
+    elif field == "email":
+        searchable_fields = [normalize_text(customer.email)]
+    else:
+        searchable_fields = [
+            normalize_text(customer.name),
+            normalize_text(customer.surname),
+            normalize_text(customer.full_name),
+            normalize_text(customer.email),
+        ]
+
+    # SR-05: Exact match occurs when normalized search string is equal to at least one field
+    if any(normalized_query == f for f in searchable_fields):
+        return MatchType.EXACT
+
+    # SR-03: Partial match occurs when normalized search string is contained in at least one field
+    if any(normalized_query in f for f in searchable_fields):
+        return MatchType.PARTIAL
+
+    return None
 
 
 def classify_match(
@@ -158,35 +198,7 @@ def classify_match(
             f"Unsupported search field: '{field}'. Supported fields are: {', '.join(sorted(VALID_SEARCH_FIELDS))}"
         )
 
-    normalized_query = normalize_text(query)
-    if not normalized_query:
-        return None
-
-    if field == "name":
-        searchable_fields = [customer.name.strip().lower()]
-    elif field == "surname":
-        searchable_fields = [customer.surname.strip().lower()]
-    elif field == "full_name":
-        searchable_fields = [customer.full_name.strip().lower()]
-    elif field == "email":
-        searchable_fields = [customer.email.strip().lower()]
-    else:
-        searchable_fields = [
-            customer.name.strip().lower(),
-            customer.surname.strip().lower(),
-            customer.full_name.strip().lower(),
-            customer.email.strip().lower(),
-        ]
-
-    # SR-05: Exact match occurs when normalized search string is equal to at least one field
-    if any(normalized_query == f for f in searchable_fields):
-        return MatchType.EXACT
-
-    # SR-03: Partial match occurs when normalized search string is contained in at least one field
-    if any(normalized_query in f for f in searchable_fields):
-        return MatchType.PARTIAL
-
-    return None
+    return _classify_match_normalized(customer, normalize_text(query), field=field)
 
 
 class SearchService:
@@ -228,9 +240,13 @@ class SearchService:
             raise ValueError(
                 f"Unsupported search field: '{field}'. Supported fields are: {', '.join(sorted(VALID_SEARCH_FIELDS))}"
             )
+        normalized_query = normalize_text(query)
+        if not normalized_query:
+            return []
+
         matches: list[CustomerMatch] = []
         for customer in self.get_customers():
-            match_type = classify_match(customer, query, field=field)
+            match_type = _classify_match_normalized(customer, normalized_query, field=field)
             if match_type is not None:
                 matches.append(CustomerMatch(customer=customer, match_type=match_type))
         return matches
@@ -285,12 +301,18 @@ class SearchService:
         Raises:
             ValueError: If field is not a supported search field.
         """
-        if field is not None and field not in VALID_SEARCH_FIELDS:
-            raise ValueError(
-                f"Unsupported search field: '{field}'. Supported fields are: {', '.join(sorted(VALID_SEARCH_FIELDS))}"
-            )
-        exact_sorted = self.get_exact_matches(query, field=field)
-        partial_sorted = self.get_partial_matches(query, field=field)
+        matches = self.find_matches(query, field=field)
+
+        exact: list[Customer] = []
+        partial: list[Customer] = []
+        for m in matches:
+            if m.match_type == MatchType.EXACT:
+                exact.append(m.customer)
+            elif m.match_type == MatchType.PARTIAL:
+                partial.append(m.customer)
+
+        exact_sorted = sorted(exact, key=customer_sort_key)
+        partial_sorted = sorted(partial, key=customer_sort_key)
 
         ordered = exact_sorted + partial_sorted
         return ordered[:limit]

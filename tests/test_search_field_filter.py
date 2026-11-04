@@ -43,23 +43,34 @@ def test_filter_by_email_only(filter_customers: list[Customer]):
     """Verify field='email' returns only customers whose email matches the query (CR-01, AC-02, FR-01)."""
     service = SearchService(customers=filter_customers)
 
-    # "john" is present in Customer 1's name, Customer 2's email, Customer 3's surname, Customer 4's surname/full_name
+    # Partial email match: "john" is present in Customer 2's email
     results = service.search("john", field="email")
-
     assert len(results) == 1
     assert results[0].name == "Alice"
     assert results[0].email == "john.worker@example.com"
+
+    # Exact email match: full email address
+    exact_results = service.search("john.worker@example.com", field="email")
+    assert len(exact_results) == 1
+    assert exact_results[0].name == "Alice"
+    assert exact_results[0].email == "john.worker@example.com"
 
 
 def test_filter_by_name_only(filter_customers: list[Customer]):
     """Verify field='name' returns only customers whose name matches the query (CR-01, AC-01, FR-01)."""
     service = SearchService(customers=filter_customers)
 
+    # Exact name match
     results = service.search("john", field="name")
-
     assert len(results) == 1
     assert results[0].name == "John"
     assert results[0].surname == "Doe"
+
+    # Partial name match: "joh"
+    partial_results = service.search("joh", field="name")
+    assert len(partial_results) == 1
+    assert partial_results[0].name == "John"
+    assert partial_results[0].surname == "Doe"
 
 
 def test_filter_by_surname_only(filter_customers: list[Customer]):
@@ -78,17 +89,22 @@ def test_filter_by_full_name_only(filter_customers: list[Customer]):
     """Verify field='full_name' returns only customers whose full name matches the query (CR-01, FR-01)."""
     service = SearchService(customers=filter_customers)
 
+    # Exact full name match
     results = service.search("Elton John", field="full_name")
-
     assert len(results) == 1
     assert results[0].full_name == "Elton John"
+
+    # Partial full name match
+    partial_results = service.search("ton joh", field="full_name")
+    assert len(partial_results) == 1
+    assert partial_results[0].full_name == "Elton John"
 
 
 def test_find_matches_with_field_filter(filter_customers: list[Customer]):
     """Verify find_matches restricts matching to specified field and returns correct MatchType (CR-01)."""
     service = SearchService(customers=filter_customers)
 
-    # Email field: only Alice has 'john' in email
+    # Email field: only Alice has 'john' in email (partial match)
     matches_email = service.find_matches("john", field="email")
     assert len(matches_email) == 1
     assert matches_email[0].customer.email == "john.worker@example.com"
@@ -103,6 +119,78 @@ def test_find_matches_with_field_filter(filter_customers: list[Customer]):
     # Surname field: Elton John (exact) and Robert Johnson (partial)
     matches_surname = service.find_matches("john", field="surname")
     assert len(matches_surname) == 2
+    surname_matches_by_name = {m.customer.name: m for m in matches_surname}
+    assert surname_matches_by_name["Elton"].match_type == MatchType.EXACT
+    assert surname_matches_by_name["Robert"].match_type == MatchType.PARTIAL
+
+    # Full name field: exact match on "Elton John"
+    matches_fn_exact = service.find_matches("Elton John", field="full_name")
+    assert len(matches_fn_exact) == 1
+    assert matches_fn_exact[0].customer.name == "Elton"
+    assert matches_fn_exact[0].match_type == MatchType.EXACT
+
+    # Full name field: partial matches on "john"
+    matches_fn_partial = service.find_matches("john", field="full_name")
+    assert len(matches_fn_partial) == 3
+    fn_matches_by_name = {m.customer.name: m for m in matches_fn_partial}
+    assert fn_matches_by_name["John"].match_type == MatchType.PARTIAL
+    assert fn_matches_by_name["Robert"].match_type == MatchType.PARTIAL
+    assert fn_matches_by_name["Elton"].match_type == MatchType.PARTIAL
+
+    # Empty query returns no matches and None for classify_match
+    assert service.find_matches("", field="name") == []
+    assert classify_match(filter_customers[0], "", field="name") is None
+
+
+def test_get_exact_matches_with_field_filter(filter_customers: list[Customer]):
+    """Verify get_exact_matches filters and sorts correctly when field is specified (CR-01)."""
+    service = SearchService(customers=filter_customers)
+
+    # Exact match on name
+    exact_name = service.get_exact_matches("john", field="name")
+    assert len(exact_name) == 1
+    assert exact_name[0].name == "John"
+
+    # Exact match on surname
+    exact_surname = service.get_exact_matches("john", field="surname")
+    assert len(exact_surname) == 1
+    assert exact_surname[0].surname == "John"
+
+    # Exact match on full_name
+    exact_fn = service.get_exact_matches("elton john", field="full_name")
+    assert len(exact_fn) == 1
+    assert exact_fn[0].full_name == "Elton John"
+
+    # Exact match on email
+    exact_email = service.get_exact_matches("john.worker@example.com", field="email")
+    assert len(exact_email) == 1
+    assert exact_email[0].email == "john.worker@example.com"
+
+    # Substring query does not return exact matches
+    assert service.get_exact_matches("john", field="email") == []
+
+
+def test_get_partial_matches_with_field_filter(filter_customers: list[Customer]):
+    """Verify get_partial_matches filters and sorts correctly when field is specified (CR-01)."""
+    service = SearchService(customers=filter_customers)
+
+    # Partial match on email
+    partial_email = service.get_partial_matches("john", field="email")
+    assert len(partial_email) == 1
+    assert partial_email[0].name == "Alice"
+
+    # Partial match on surname (Elton is exact, Robert is partial)
+    partial_surname = service.get_partial_matches("john", field="surname")
+    assert len(partial_surname) == 1
+    assert partial_surname[0].name == "Robert"
+
+    # Partial match on full_name (sorted alphabetically by customer_sort_key: Elton John, John Doe, Robert Johnson)
+    partial_fn = service.get_partial_matches("john", field="full_name")
+    assert len(partial_fn) == 3
+    assert [c.name for c in partial_fn] == ["Elton", "John", "Robert"]
+
+    # Non-matching query returns empty
+    assert service.get_partial_matches("xyz", field="name") == []
 
 
 def test_filter_none_or_omitted_preserves_default_behavior(filter_customers: list[Customer]):
